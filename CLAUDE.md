@@ -35,6 +35,10 @@ cortex-local-manager/
 │   ├── suex/                      # SUEX exception config management
 │   │   ├── SuexModels.kt         # Data classes for SUEX JSON schema
 │   │   └── SuexManager.kt        # Create, load, save, validate SUEX files
+│   ├── inventory/                 # Endpoint inventory collection
+│   │   └── EndpointInventoryCollector.kt  # System, process, session, network info
+│   ├── hunting/                   # IoC list management
+│   │   └── IocListManager.kt     # Import/parse/export IoC lists
 │   ├── models/                    # Shared data classes
 │   │   ├── AgentInfo.kt
 │   │   ├── ProtectionStatus.kt
@@ -48,7 +52,8 @@ cortex-local-manager/
 │   ├── navigation/                # Sidebar, screen enum
 │   ├── dashboard/                 # Agent status overview + recent alerts
 │   ├── detections/                # Prevention logs, EDR events, telemetry viewer
-│   ├── hunting/                   # Hash search, DB refresh, hash browser
+│   ├── inventory/                 # Endpoint inventory (system, processes, sessions)
+│   ├── hunting/                   # Hash search, IoC import, DB refresh, hash browser
 │   ├── exceptions/                # SUEX exception editor
 │   ├── theme/                     # Dark professional styling
 │   └── components/                # Shared UI: DataTable, StatusBadge, HashText, etc.
@@ -239,11 +244,27 @@ Execute tasks from `tasks/` in this order — each builds on the previous:
 3. **03_log_parsers.md** — EDR/Prevention parsers, LogWatcher, LogRepository
 4. **04_ui_shell.md** — Theme, sidebar navigation, password entry, shared components
 5. **05_dashboard.md** — Agent status cards + recent alerts feed
-6. **06_detections_viewer.md** — Full alert table with filtering + detail panel
-7. **07_threat_hunting.md** — Hash search, DB refresh, hash browser
+6. **06_detections_viewer.md** — Full alert table with filtering + detail panel + data export (R1)
+7. **07_threat_hunting.md** — Hash search, IoC list import + batch search + blacklisting (R6), DB refresh, hash browser
 8. **08_suex_exceptions.md** — SUEX exception editor (visual + JSON mode)
+9. **09_endpoint_inventory.md** — System info, running processes, user sessions, network, export (R4)
 
-Tasks 01-03 are backend/core. Tasks 04-08 are UI. Task 04 must come before 05-08 since they plug into the shell.
+Tasks 01-03 are backend/core. Tasks 04-09 are UI. Task 04 must come before 05-09 since they plug into the shell.
+
+## Requirements Coverage
+
+| Req | Description | Covered By | Status |
+|-----|-------------|-----------|--------|
+| R1 | Data in own data centers / export | Task 06 export, Task 09 export | ✅ |
+| R2 | Crash dumps not readable | N/A (marked impossible) | ❌ |
+| R3 | Disconnect and keep running | Entire tool concept | ✅ |
+| R4 | Inventory (hostname, IP, processes, sessions) | Task 09 | ✅ |
+| R5 | Threat info with timestamps | Tasks 03, 05, 06 | ✅ |
+| R6 | Offline IoC hunting + import lists | Task 07 (IoC list import, batch search, blacklist) | ✅ |
+| R7 | Detection results stored locally | Tasks 03, 06 | ✅ |
+| R8 | Encrypted communication | Out of scope (infrastructure) | — |
+| R9 | Keys stored with customer | Out of scope (infrastructure) | — |
+| R10 | Licensing / development costs | Out of scope (business) | — |
 
 ## Important Notes
 

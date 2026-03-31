@@ -37,13 +37,14 @@ class CytoolCommands(
         }
     }
 
-    suspend fun lastCheckin(): CytoolResult<String?> {
+    /**
+     * Returns a Pair of (display text, extractable timestamp or null).
+     */
+    suspend fun lastCheckin(): CytoolResult<Pair<String, String?>> {
         return when (val result = executor.execute("last_checkin")) {
             is CytoolResult.Success -> {
-                val timestamp = result.data.lines()
-                    .firstOrNull { it.isNotBlank() }
-                    ?.trim()
-                CytoolResult.Success(timestamp, result.rawOutput)
+                val parsed = CytoolOutputParser.parseLastCheckin(result.data)
+                CytoolResult.Success(parsed, result.rawOutput)
             }
             is CytoolResult.Error -> result
             is CytoolResult.Timeout -> result
@@ -109,6 +110,49 @@ class CytoolCommands(
             }
             is CytoolResult.Error -> result
             is CytoolResult.Timeout -> result
+        }
+    }
+
+    // --- Security Events (primary alert source) ---
+
+    /**
+     * Fetches security events via `cytool security_events print`.
+     * Returns raw JSON string. Requires supervisor password.
+     */
+    suspend fun getSecurityEvents(): CytoolResult<String> {
+        val password = passwordProvider()
+            ?: return CytoolResult.Error("Supervisor password not set", "", -1)
+
+        return when (val result = executor.execute("security_events", "print", password = password, timeoutSeconds = 60)) {
+            is CytoolResult.Success -> {
+                // The output is JSON directly (may have preamble text before it)
+                val output = result.data
+                val jsonStart = output.indexOfFirst { it == '{' || it == '[' }
+                if (jsonStart >= 0) {
+                    val jsonStr = output.substring(jsonStart).trim()
+                    // If it's a single object (not array), wrap it
+                    val normalized = if (jsonStr.startsWith("{")) "[$jsonStr]" else jsonStr
+                    CytoolResult.Success(normalized, result.rawOutput)
+                } else {
+                    CytoolResult.Error("No JSON in security_events output", result.rawOutput, 0)
+                }
+            }
+            is CytoolResult.Error -> result
+            is CytoolResult.Timeout -> result
+        }
+    }
+
+    // --- Password Validation ---
+
+    /**
+     * Validates the supervisor password by attempting a password-protected command.
+     * Uses `persist list` which requires a password — if it succeeds, the password is correct.
+     */
+    suspend fun validatePassword(password: String): Boolean {
+        return when (executor.execute("persist", "print", "agent_actions.db", password = password)) {
+            is CytoolResult.Success -> true
+            is CytoolResult.Error -> false
+            is CytoolResult.Timeout -> false
         }
     }
 

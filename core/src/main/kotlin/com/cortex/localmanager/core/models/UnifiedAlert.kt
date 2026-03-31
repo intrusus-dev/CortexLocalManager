@@ -10,13 +10,19 @@ data class UnifiedAlert(
     val source: AlertSource,
     val processPath: String?,
     val commandLine: String?,
+    val pid: Long? = null,
+    val parentPid: Long? = null,
     val sha256: String?,
     val md5: String?,
     val filePath: String?,
+    val fileSize: Long? = null,
     val user: String?,
+    val userSid: String? = null,
     val description: String,
     val actionTaken: String?,
     val componentName: String?,
+    val applicationName: String? = null,
+    val publisher: String? = null,
     val rawData: String?
 )
 

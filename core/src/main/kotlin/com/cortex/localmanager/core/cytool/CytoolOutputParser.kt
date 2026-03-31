@@ -131,6 +131,30 @@ object CytoolOutputParser {
      * Iterated [42] entries.
      * ```
      */
+    /**
+     * Parses `cytool last_checkin` output.
+     * Known formats:
+     * - `"Persistent Last Successful Check-In time    03/31/2026 12:00:00 PM"`
+     * - `"Persistent Last Successful Check-In time: 2026-03-31T12:00:00"`
+     * - Just a raw timestamp on a line
+     *
+     * Returns the raw output as display text and extracts a timestamp if found.
+     */
+    fun parseLastCheckin(output: String): Pair<String, String?> {
+        val trimmed = output.trim()
+        if (trimmed.isBlank()) return "" to null
+
+        // Try to extract a timestamp from the output
+        // Pattern: date-like string at the end (MM/DD/YYYY, YYYY-MM-DD, etc.)
+        val dateTimeRegex = Regex(
+            """(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?|\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})"""
+        )
+        val match = dateTimeRegex.find(trimmed)
+        val timestamp = match?.value
+
+        return trimmed to timestamp
+    }
+
     fun extractJsonFromPersist(output: String): String? {
         val lines = output.lines()
         // Find the line(s) that form the JSON array

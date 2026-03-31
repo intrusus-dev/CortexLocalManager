@@ -29,30 +29,80 @@ class LogRepository(
     suspend fun loadExisting(logDirectory: Path = AppConfig.cyveraLogPath) {
         val allAlerts = mutableListOf<UnifiedAlert>()
 
-        // Load EDR events
-        edrParser.parseDirectory(logDirectory)
-            .onSuccess { events ->
-                allAlerts.addAll(events.map { it.toUnifiedAlert() })
-            }
-            .onFailure { logger.warn(it) { "Failed to load EDR events" } }
+        logger.info { "Loading existing logs from: $logDirectory" }
 
-        // Load prevention XML alerts
-        preventionParser.parseDirectory(logDirectory)
-            .onSuccess { alerts ->
-                allAlerts.addAll(alerts.map { it.toUnifiedAlert() })
-            }
-            .onFailure { logger.warn(it) { "Failed to load prevention alerts" } }
+        if (java.nio.file.Files.exists(logDirectory)) {
+            // Load EDR events from directory and subdirectories
+            edrParser.parseDirectory(logDirectory)
+                .onSuccess { events ->
+                    logger.info { "Loaded ${events.size} EDR events from $logDirectory" }
+                    allAlerts.addAll(events.map { it.toUnifiedAlert() })
+                }
+                .onFailure { logger.warn(it) { "Failed to load EDR events" } }
 
-        // Load from Windows Event Log
-        preventionParser.readFromEventLog()
+            // Load prevention XML alerts
+            preventionParser.parseDirectory(logDirectory)
+                .onSuccess { alerts ->
+                    logger.info { "Loaded ${alerts.size} prevention alerts from $logDirectory" }
+                    allAlerts.addAll(alerts.map { it.toUnifiedAlert() })
+                }
+                .onFailure { logger.warn(it) { "Failed to load prevention alerts" } }
+
+            // Also scan subdirectories for log files
+            try {
+                java.nio.file.Files.list(logDirectory)
+                    .filter { java.nio.file.Files.isDirectory(it) }
+                    .forEach { subDir ->
+                        edrParser.parseDirectory(subDir)
+                            .onSuccess { events ->
+                                if (events.isNotEmpty()) {
+                                    logger.info { "Loaded ${events.size} EDR events from $subDir" }
+                                    allAlerts.addAll(events.map { it.toUnifiedAlert() })
+                                }
+                            }
+                        preventionParser.parseDirectory(subDir)
+                            .onSuccess { alerts ->
+                                if (alerts.isNotEmpty()) {
+                                    logger.info { "Loaded ${alerts.size} prevention alerts from $subDir" }
+                                    allAlerts.addAll(alerts.map { it.toUnifiedAlert() })
+                                }
+                            }
+                    }
+            } catch (e: Exception) {
+                logger.debug(e) { "Error scanning subdirectories" }
+            }
+        } else {
+            logger.warn { "Log directory does not exist: $logDirectory" }
+        }
+
+        // Load from Windows Event Log (works regardless of file directory)
+        preventionParser.readFromEventLog(maxEvents = 200)
             .onSuccess { alerts ->
+                logger.info { "Loaded ${alerts.size} alerts from Windows Event Log" }
                 val eventLogAlerts = alerts.map { it.toUnifiedAlert(AlertSource.EVENT_LOG) }
                 allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogAlerts))
             }
-            .onFailure { logger.debug(it) { "Event Log read skipped or failed" } }
+            .onFailure { logger.info(it) { "Event Log read skipped or failed" } }
 
         _alerts.value = allAlerts.sortedByDescending { it.timestamp }
-        logger.info { "Loaded ${allAlerts.size} total alerts" }
+        logger.info { "Total alerts loaded: ${allAlerts.size}" }
+    }
+
+    /**
+     * Load alerts from cytool security_events print JSON.
+     * This is the richest data source — use when supervisor password is available.
+     */
+    fun loadSecurityEvents(jsonArrayString: String) {
+        val events = SecurityEventsParser.parseSecurityEvents(jsonArrayString)
+        if (events.isNotEmpty()) {
+            logger.info { "Loaded ${events.size} alerts from security_events" }
+            val current = _alerts.value.toMutableList()
+            // Deduplicate by prevention_id
+            val existingIds = current.map { it.id }.toSet()
+            val newEvents = events.filter { it.id !in existingIds }
+            current.addAll(newEvents)
+            _alerts.value = current.sortedByDescending { it.timestamp }
+        }
     }
 
     fun startWatching(scope: CoroutineScope): Job {
@@ -161,6 +211,8 @@ private fun EdrEvent.toUnifiedAlert(): UnifiedAlert {
         source = AlertSource.EDR_JSON,
         processPath = processPath,
         commandLine = commandLine,
+        pid = pid,
+        parentPid = parentPid,
         sha256 = sha256,
         md5 = null,
         filePath = filePath,
@@ -183,10 +235,12 @@ private fun PreventionAlert.toUnifiedAlert(
         source = source,
         processPath = processPath,
         commandLine = null,
+        pid = pid,
         sha256 = sha256,
         md5 = md5,
         filePath = filePath,
         user = user,
+        userSid = userSid,
         description = description ?: operationStatus ?: "Prevention Alert",
         actionTaken = operationStatus,
         componentName = componentName,

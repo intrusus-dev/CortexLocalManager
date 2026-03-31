@@ -4,9 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="Add UI and core components for initial application structure">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolOutputParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolOutputParser.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/ui/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/App.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,6 +62,9 @@
     <commands />
     <urls />
   </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 7,
   &quot;fromUser&quot;: false
@@ -93,12 +105,31 @@
       <option name="presentableId" value="Default" />
       <updated>1774805930680</updated>
     </task>
+    <task id="LOCAL-00001" summary="Add UI and core components for initial application structure">
+      <option name="closed" value="true" />
+      <created>1774950715709</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1774950715709</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Add UI and core components for initial application structure">
+      <option name="closed" value="true" />
+      <created>1774950727271</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1774950727271</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
-    <option name="LAST_COMMIT_MESSAGE" value="" />
+    <MESSAGE value="Add initial implementation for Cortex Local Manager" />
+    <MESSAGE value="Add UI and core components for initial application structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add UI and core components for initial application structure" />
   </component>
 </project>

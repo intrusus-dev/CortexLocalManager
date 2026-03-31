@@ -107,21 +107,78 @@ class PreventionLogParser {
             return@runCatching emptyList()
         }
 
-        val process = ProcessBuilder(
-            "wevtutil", "qe", "Palo Alto Networks",
-            "/rd:true", "/f:xml", "/c:$maxEvents"
-        ).redirectErrorStream(true).start()
+        // Try multiple known Cortex XDR event log channels
+        val channels = listOf(
+            "Palo Alto Networks",
+            "Traps",
+            "Cortex XDR"
+        )
 
-        val output = process.inputStream.bufferedReader().readText()
-        val exitCode = process.waitFor()
-
-        if (exitCode != 0) {
-            logger.warn { "wevtutil failed with exit code $exitCode" }
-            return@runCatching emptyList()
+        val allEvents = mutableListOf<PreventionAlert>()
+        for (channel in channels) {
+            val channelEvents = readChannel(channel, maxEvents)
+            if (channelEvents.isNotEmpty()) {
+                logger.info { "Found ${channelEvents.size} events in channel '$channel'" }
+                allEvents.addAll(channelEvents)
+            }
         }
 
-        // wevtutil outputs each event as a separate XML block
-        val events = output.split("</Event>")
+        // Also try querying by provider name in the Application/System logs
+        val providerQuery = "*[System[Provider[@Name='Traps'] or Provider[@Name='Cortex XDR'] or Provider[@Name='CortexXDR']]]"
+        for (logName in listOf("Application", "System")) {
+            val providerEvents = readChannelWithQuery(logName, providerQuery, maxEvents)
+            if (providerEvents.isNotEmpty()) {
+                logger.info { "Found ${providerEvents.size} events from XDR provider in '$logName'" }
+                allEvents.addAll(providerEvents)
+            }
+        }
+
+        logger.info { "Total Windows Event Log alerts: ${allEvents.size}" }
+        allEvents
+    }
+
+    private fun readChannel(channel: String, maxEvents: Int): List<PreventionAlert> {
+        return try {
+            val process = ProcessBuilder(
+                "wevtutil", "qe", channel,
+                "/rd:true", "/f:xml", "/c:$maxEvents"
+            ).redirectErrorStream(true).start()
+
+            val output = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+
+            if (exitCode != 0) {
+                logger.debug { "wevtutil channel '$channel' returned exit code $exitCode" }
+                return emptyList()
+            }
+
+            parseEventLogOutput(output)
+        } catch (e: Exception) {
+            logger.debug { "Failed to read channel '$channel': ${e.message}" }
+            emptyList()
+        }
+    }
+
+    private fun readChannelWithQuery(logName: String, query: String, maxEvents: Int): List<PreventionAlert> {
+        return try {
+            val process = ProcessBuilder(
+                "wevtutil", "qe", logName,
+                "/q:$query", "/rd:true", "/f:xml", "/c:$maxEvents"
+            ).redirectErrorStream(true).start()
+
+            val output = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+
+            if (exitCode != 0) return emptyList()
+            parseEventLogOutput(output)
+        } catch (e: Exception) {
+            logger.debug { "Failed to query '$logName': ${e.message}" }
+            emptyList()
+        }
+    }
+
+    private fun parseEventLogOutput(output: String): List<PreventionAlert> {
+        return output.split("</Event>")
             .filter { it.contains("<Event") }
             .mapNotNull { xmlBlock ->
                 try {
@@ -132,9 +189,6 @@ class PreventionLogParser {
                     null
                 }
             }
-
-        logger.info { "Loaded ${events.size} prevention alerts from Windows Event Log" }
-        events
     }
 
     private fun parseEventLogXml(xml: String): PreventionAlert? {
