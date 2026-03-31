@@ -4,18 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="Add UI and core components for initial application structure">
+    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="Add Dashboard and Detections screens with ViewModels and UI components">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolOutputParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolOutputParser.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/SecurityEventsParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/SecurityEventsParser.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/models/UnifiedAlert.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/models/UnifiedAlert.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/ui/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/App.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/App.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/navigation/Sidebar.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/navigation/Sidebar.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -94,9 +93,14 @@
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;
+    &quot;settings.editor.selected.configurable&quot;: &quot;org.jetbrains.plugins.github.ui.GithubSettingsConfigurable&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/.claude/evidence" />
+    </key>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="" />
@@ -121,15 +125,39 @@
       <option name="project" value="LOCAL" />
       <updated>1774950727271</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Add Dashboard and Detections screens with ViewModels and UI components">
+      <option name="closed" value="true" />
+      <created>1774968493528</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1774968493528</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Add initial implementation for Cortex Local Manager" />
     <MESSAGE value="Add UI and core components for initial application structure" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add UI and core components for initial application structure" />
+    <MESSAGE value="Add Dashboard and Detections screens with ViewModels and UI components" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add Dashboard and Detections screens with ViewModels and UI components" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

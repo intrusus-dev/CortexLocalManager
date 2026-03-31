@@ -20,6 +20,7 @@ fun Sidebar(
     currentScreen: Screen,
     onScreenSelected: (Screen) -> Unit,
     isAgentConnected: Boolean,
+    alertBadgeCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -55,9 +56,11 @@ fun Sidebar(
         // Navigation items
         Screen.entries.forEach { screen ->
             val isActive = screen == currentScreen
+            val badge = if (screen == Screen.DETECTIONS && alertBadgeCount > 0) alertBadgeCount else 0
             NavItem(
                 screen = screen,
                 isActive = isActive,
+                badgeCount = badge,
                 onClick = { onScreenSelected(screen) }
             )
         }
@@ -94,6 +97,7 @@ fun Sidebar(
 private fun NavItem(
     screen: Screen,
     isActive: Boolean,
+    badgeCount: Int = 0,
     onClick: () -> Unit
 ) {
     Row(
@@ -128,13 +132,28 @@ private fun NavItem(
 
         Spacer(Modifier.width(12.dp))
 
-        Column {
-            Text(
-                text = screen.label,
-                fontSize = 13.sp,
-                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isActive) CortexColors.TextPrimary else CortexColors.TextSecondary
-            )
+        Text(
+            text = screen.label,
+            fontSize = 13.sp,
+            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isActive) CortexColors.TextPrimary else CortexColors.TextSecondary
+        )
+
+        if (badgeCount > 0) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .background(CortexColors.PaloAltoOrange, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 6.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = androidx.compose.ui.graphics.Color.White
+                )
+            }
         }
     }
 }

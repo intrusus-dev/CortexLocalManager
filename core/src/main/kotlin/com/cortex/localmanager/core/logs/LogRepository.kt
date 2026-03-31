@@ -84,6 +84,10 @@ class LogRepository(
             }
             .onFailure { logger.info(it) { "Event Log read skipped or failed" } }
 
+        // Preserve any existing security_events alerts (password-protected source)
+        val existingSecEvents = _alerts.value.filter { it.source == AlertSource.SECURITY_EVENTS }
+        allAlerts.addAll(existingSecEvents)
+
         _alerts.value = allAlerts.sortedByDescending { it.timestamp }
         logger.info { "Total alerts loaded: ${allAlerts.size}" }
     }
@@ -94,15 +98,19 @@ class LogRepository(
      */
     fun loadSecurityEvents(jsonArrayString: String) {
         val events = SecurityEventsParser.parseSecurityEvents(jsonArrayString)
-        if (events.isNotEmpty()) {
-            logger.info { "Loaded ${events.size} alerts from security_events" }
-            val current = _alerts.value.toMutableList()
-            // Deduplicate by prevention_id
-            val existingIds = current.map { it.id }.toSet()
-            val newEvents = events.filter { it.id !in existingIds }
-            current.addAll(newEvents)
-            _alerts.value = current.sortedByDescending { it.timestamp }
-        }
+        logger.info { "Loaded ${events.size} alerts from security_events" }
+        // Replace existing security_events alerts, keep everything else
+        val nonSecEvents = _alerts.value.filter { it.source != AlertSource.SECURITY_EVENTS }
+        _alerts.value = (nonSecEvents + events).sortedByDescending { it.timestamp }
+    }
+
+    /**
+     * Remove alerts that came from security_events (password-protected source).
+     * Called when the supervisor password is cleared.
+     */
+    fun clearSecurityEvents() {
+        _alerts.value = _alerts.value.filter { it.source != AlertSource.SECURITY_EVENTS }
+        logger.info { "Cleared security_events alerts. Remaining: ${_alerts.value.size}" }
     }
 
     fun startWatching(scope: CoroutineScope): Job {
@@ -132,11 +140,15 @@ class LogRepository(
             result = result.filter { alert ->
                 alert.processPath?.lowercase()?.contains(q) == true ||
                     alert.sha256?.lowercase()?.contains(q) == true ||
+                    alert.md5?.lowercase()?.contains(q) == true ||
                     alert.description.lowercase().contains(q) ||
                     alert.user?.lowercase()?.contains(q) == true ||
+                    alert.userSid?.lowercase()?.contains(q) == true ||
                     alert.filePath?.lowercase()?.contains(q) == true ||
                     alert.commandLine?.lowercase()?.contains(q) == true ||
-                    alert.componentName?.lowercase()?.contains(q) == true
+                    alert.componentName?.lowercase()?.contains(q) == true ||
+                    alert.applicationName?.lowercase()?.contains(q) == true ||
+                    alert.id.lowercase().contains(q)
             }
         }
 

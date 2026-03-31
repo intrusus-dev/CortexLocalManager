@@ -30,7 +30,7 @@ enum class Severity { CRITICAL, HIGH, MEDIUM, LOW, INFO }
 
 enum class AlertType { PREVENTION, EDR, TELEMETRY }
 
-enum class AlertSource { LOCAL_XML, EDR_JSON, EVENT_LOG, PERSIST_DB }
+enum class AlertSource { LOCAL_XML, EDR_JSON, EVENT_LOG, SECURITY_EVENTS }
 
 data class FilterCriteria(
     val searchText: String? = null,

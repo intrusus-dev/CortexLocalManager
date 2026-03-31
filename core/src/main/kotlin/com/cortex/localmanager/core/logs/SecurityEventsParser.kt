@@ -97,7 +97,7 @@ object SecurityEventsParser {
             timestamp = timestamp,
             severity = severity,
             alertType = AlertType.PREVENTION,
-            source = AlertSource.PERSIST_DB,
+            source = AlertSource.SECURITY_EVENTS,
             processPath = processPath,
             commandLine = processCommandLine,
             pid = pid,

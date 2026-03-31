@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,8 @@ import com.cortex.localmanager.ui.dashboard.DashboardScreen
 import com.cortex.localmanager.ui.dashboard.DashboardViewModel
 import com.cortex.localmanager.ui.detections.DetectionsScreen
 import com.cortex.localmanager.ui.detections.DetectionsViewModel
+import com.cortex.localmanager.ui.hunting.HuntingScreen
+import com.cortex.localmanager.ui.hunting.HuntingViewModel
 import com.cortex.localmanager.ui.navigation.Screen
 import com.cortex.localmanager.ui.theme.CortexColors
 import com.cortex.localmanager.ui.theme.CortexTheme
@@ -59,13 +62,44 @@ fun main() = application {
             )
         }
 
+        val huntingViewModel = remember {
+            HuntingViewModel(
+                cytoolCommands = serviceLocator.cytoolCommands,
+                scope = uiScope
+            )
+        }
+
+        // Track hash to pre-fill when navigating from Detections → Hunting
+        var huntingPrefilledHash by remember { mutableStateOf<String?>(null) }
+
+        // When password is cleared (locked), remove sensitive data
+        LaunchedEffect(supervisorPassword.value) {
+            if (supervisorPassword.value == null) {
+                serviceLocator.logRepository.clearSecurityEvents()
+                detectionsViewModel.selectAlert(null)
+            }
+        }
+
         val dashboardState by dashboardViewModel.state.collectAsState()
+        val detectionsState by detectionsViewModel.state.collectAsState()
+
+        // Track new alerts for badge — count alerts added while not on Detections screen
+        var lastSeenAlertCount by remember { mutableStateOf(0) }
+        var newAlertBadge by remember { mutableStateOf(0) }
+        val totalAlerts = detectionsState.allAlerts.size
+        if (currentScreen == Screen.DETECTIONS) {
+            lastSeenAlertCount = totalAlerts
+            newAlertBadge = 0
+        } else if (totalAlerts > lastSeenAlertCount) {
+            newAlertBadge = totalAlerts - lastSeenAlertCount
+        }
 
         CortexTheme {
             AppContent(
                 supervisorPassword = supervisorPassword,
                 isOffline = dashboardState.isOffline,
                 currentScreen = currentScreen,
+                alertBadgeCount = newAlertBadge,
                 onScreenSelected = { currentScreen = it },
                 onRefresh = {
                     when (currentScreen) {
@@ -98,12 +132,22 @@ fun main() = application {
                         Screen.DETECTIONS -> DetectionsScreen(
                             viewModel = detectionsViewModel,
                             onSearchHash = { hash ->
-                                // Will navigate to Hunting in Task 07
+                                huntingPrefilledHash = hash
+                                currentScreen = Screen.HUNTING
                             },
                             onAddException = { hash, path ->
                                 // Will navigate to Exceptions in Task 08
                             }
                         )
+                        Screen.HUNTING -> {
+                            HuntingScreen(
+                                viewModel = huntingViewModel,
+                                onAddException = { hash, path ->
+                                    // Will navigate to Exceptions in Task 08
+                                },
+                                prefilledHash = huntingPrefilledHash.also { huntingPrefilledHash = null }
+                            )
+                        }
                         else -> PlaceholderScreen(screen)
                     }
                 }

@@ -31,13 +31,15 @@ fun AppContent(
     onScreenSelected: (Screen) -> Unit,
     onRefresh: () -> Unit,
     onValidatePassword: suspend (String) -> Boolean,
+    alertBadgeCount: Int = 0,
     screenContent: @Composable (Screen) -> Unit
 ) {
     Row(modifier = Modifier.fillMaxSize().background(CortexColors.Background)) {
         Sidebar(
             currentScreen = currentScreen,
             onScreenSelected = onScreenSelected,
-            isAgentConnected = !isOffline
+            isAgentConnected = !isOffline,
+            alertBadgeCount = alertBadgeCount
         )
 
         Box(

@@ -5,8 +5,6 @@ import com.cortex.localmanager.core.models.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
@@ -104,7 +102,7 @@ class DetectionsViewModel(
         val alerts = if (filteredOnly) _state.value.filteredAlerts else _state.value.allAlerts
         return runCatching {
             val entries = alerts.map { it.toExportMap() }
-            val jsonStr = Json { prettyPrint = true }.encodeToString(entries)
+            val jsonStr = buildJsonArray(entries)
             outputPath.writeText(jsonStr)
             _state.update { it.copy(exportMessage = "Exported ${alerts.size} alerts to ${outputPath.fileName}") }
             outputPath
@@ -193,4 +191,23 @@ private fun csvEscape(value: String?): String {
     return if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
         "\"${value.replace("\"", "\"\"")}\""
     } else value
+}
+
+private fun buildJsonArray(entries: List<Map<String, String?>>): String {
+    val sb = StringBuilder("[\n")
+    entries.forEachIndexed { index, map ->
+        sb.append("  {\n")
+        val fields = map.entries.toList()
+        fields.forEachIndexed { i, (key, value) ->
+            val jsonValue = if (value == null) "null" else "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+            sb.append("    \"$key\": $jsonValue")
+            if (i < fields.size - 1) sb.append(",")
+            sb.append("\n")
+        }
+        sb.append("  }")
+        if (index < entries.size - 1) sb.append(",")
+        sb.append("\n")
+    }
+    sb.append("]")
+    return sb.toString()
 }
