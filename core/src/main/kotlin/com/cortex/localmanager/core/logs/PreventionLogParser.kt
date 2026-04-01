@@ -117,7 +117,7 @@ class PreventionLogParser {
         )
 
         val allParsedAlerts = mutableListOf<PreventionAlert>()
-        val allEmbeddedJsons = mutableListOf<String>()
+        val allEmbeddedJsons = mutableListOf<Pair<String, Instant>>()
 
         for (channel in channels) {
             val results = readChannel(channel, maxEvents)
@@ -138,13 +138,13 @@ class PreventionLogParser {
     /** Aggregated results from Event Log reading */
     data class EventLogResults(
         val alerts: List<PreventionAlert>,
-        val embeddedJsons: List<String>
+        val embeddedJsons: List<Pair<String, Instant>>  // (json, eventLogTimestamp)
     )
 
     private fun processResults(
         results: List<EventLogParseResult>,
         alerts: MutableList<PreventionAlert>,
-        jsons: MutableList<String>,
+        jsons: MutableList<Pair<String, Instant>>,
         sourceName: String
     ) {
         if (results.isEmpty()) return
@@ -153,7 +153,7 @@ class PreventionLogParser {
         for (result in results) {
             when (result) {
                 is EventLogParseResult.ParsedAlert -> { alerts.add(result.alert); alertCount++ }
-                is EventLogParseResult.EmbeddedJson -> { jsons.add(result.json); jsonCount++ }
+                is EventLogParseResult.EmbeddedJson -> { jsons.add(result.json to result.timestamp); jsonCount++ }
             }
         }
         if (alertCount > 0 || jsonCount > 0) {

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
@@ -43,6 +43,9 @@ data class HuntingState(
     val hashEntries: List<FileIdHashEntry> = emptyList(),
     val hashEntriesLoading: Boolean = false,
     val hashEntriesFilter: String = "",
+    // Blocklist
+    val blocklistEntries: List<BlocklistEntry> = emptyList(),
+    val blocklistLoading: Boolean = false,
     // IoC
     val iocList: List<IocEntry> = emptyList(),
     val iocSearchResults: List<IocSearchResult> = emptyList(),
@@ -51,6 +54,8 @@ data class HuntingState(
     val message: String? = null,
     val error: String? = null
 )
+
+data class BlocklistEntry(val sha256: String, val verdict: Int)
 
 private val SHA256_REGEX = Regex("^[a-fA-F0-9]{64}$")
 private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -274,6 +279,32 @@ class HuntingViewModel(
         _state.update { it.copy(hashEntriesFilter = filter) }
     }
 
+    // --- Blocklist Browser ---
+
+    fun loadBlocklist() {
+        scope.launch {
+            _state.update { it.copy(blocklistLoading = true) }
+            when (val result = cytoolCommands.printDatabase("hash_overrides.db")) {
+                is CytoolResult.Success -> {
+                    try {
+                        val arr = json.parseToJsonElement(result.data).jsonArray
+                        val entries = arr.mapNotNull { el ->
+                            val obj = el.jsonObject
+                            val key = obj["key"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                            val verdict = obj["value"]?.jsonObject?.get("verdict")?.jsonPrimitive?.intOrNull ?: 0
+                            BlocklistEntry(key, verdict)
+                        }
+                        _state.update { it.copy(blocklistEntries = entries, blocklistLoading = false) }
+                    } catch (e: Exception) {
+                        _state.update { it.copy(blocklistLoading = false, error = "Failed to parse blocklist: ${e.message}") }
+                    }
+                }
+                is CytoolResult.Error -> _state.update { it.copy(blocklistLoading = false, error = result.message) }
+                is CytoolResult.Timeout -> _state.update { it.copy(blocklistLoading = false, error = "Timed out loading blocklist") }
+            }
+        }
+    }
+
     // --- IoC Management ---
 
     fun importIocList(path: Path) {
@@ -352,6 +383,18 @@ class HuntingViewModel(
         iocManager.exportResults(_state.value.iocSearchResults, outputPath, format)
             .onSuccess { _state.update { it.copy(message = "Exported to ${outputPath.fileName}") } }
             .onFailure { e -> _state.update { it.copy(error = "Export failed: ${e.message}") } }
+    }
+
+    /** Blacklist a single hash. */
+    fun blacklistHash(sha256: String) {
+        scope.launch {
+            _state.update { it.copy(message = "Adding to blocklist...") }
+            when (val result = cytoolCommands.blacklistHashes(listOf(sha256))) {
+                is CytoolResult.Success -> _state.update { it.copy(message = result.data) }
+                is CytoolResult.Error -> _state.update { it.copy(error = "Blacklist failed: ${result.message}") }
+                is CytoolResult.Timeout -> _state.update { it.copy(error = "Blacklist timed out") }
+            }
+        }
     }
 
     /**

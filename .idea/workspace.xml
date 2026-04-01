@@ -4,26 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="Add Hunting screen with ViewModel and UI components">
+    <list default="true" id="148e553a-2418-4456-8541-9d03b3e261c1" name="Changes" comment="Add Agent Control screen with ViewModel and UI components for protection and runtime management">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolCommands.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolExecutor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/cytool/CytoolExecutor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/LogRepository.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/PreventionLogParser.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/SecurityEventsParser.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/logs/SecurityEventsParser.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/models/UnifiedAlert.kt" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/kotlin/com/cortex/localmanager/core/models/UnifiedAlert.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/ui/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/Main.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/ServiceLocator.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/components/StatusBadge.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/components/StatusBadge.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/dashboard/DashboardScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/dashboard/DashboardScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/detections/DetectionsViewModel.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/hunting/HuntingScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/hunting/HuntingScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/hunting/HuntingViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/hunting/HuntingViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/navigation/Screen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/navigation/Screen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/theme/CortexTheme.kt" beforeDir="false" afterPath="$PROJECT_DIR$/ui/src/main/kotlin/com/cortex/localmanager/ui/theme/CortexTheme.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -150,7 +137,15 @@
       <option name="project" value="LOCAL" />
       <updated>1774971753792</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Add Agent Control screen with ViewModel and UI components for protection and runtime management">
+      <option name="closed" value="true" />
+      <created>1775002413598</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1775002413598</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -172,7 +167,8 @@
     <MESSAGE value="Add UI and core components for initial application structure" />
     <MESSAGE value="Add Dashboard and Detections screens with ViewModels and UI components" />
     <MESSAGE value="Add Hunting screen with ViewModel and UI components" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add Hunting screen with ViewModel and UI components" />
+    <MESSAGE value="Add Agent Control screen with ViewModel and UI components for protection and runtime management" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add Agent Control screen with ViewModel and UI components for protection and runtime management" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

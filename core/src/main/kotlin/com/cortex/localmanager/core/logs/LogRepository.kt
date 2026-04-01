@@ -85,13 +85,19 @@ class LogRepository(
                     allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogAlerts))
                 }
                 // Handle embedded JSON events (Cortex XDR pattern)
-                for (jsonStr in results.embeddedJsons) {
+                for ((jsonStr, eventLogTimestamp) in results.embeddedJsons) {
                     val normalized = if (jsonStr.trim().startsWith("{")) "[$jsonStr]" else jsonStr
                     val parsed = SecurityEventsParser.parseSecurityEvents(normalized)
                     if (parsed.isNotEmpty()) {
                         logger.info { "Parsed ${parsed.size} rich alerts from Event Log embedded JSON" }
-                        // Mark these as EVENT_LOG source but with full detail
-                        val eventLogRichAlerts = parsed.map { it.copy(source = AlertSource.EVENT_LOG) }
+                        // Use Event Log timestamp if the JSON didn't have its own time field
+                        val eventLogRichAlerts = parsed.map { alert ->
+                            val useEventLogTs = alert.timestamp.epochSeconds > (Clock.System.now().epochSeconds - 5)
+                            alert.copy(
+                                source = AlertSource.EVENT_LOG,
+                                timestamp = if (useEventLogTs) eventLogTimestamp else alert.timestamp
+                            )
+                        }
                         allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogRichAlerts))
                     }
                 }

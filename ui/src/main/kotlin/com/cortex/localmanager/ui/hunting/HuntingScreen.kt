@@ -94,7 +94,17 @@ fun HuntingScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // Section 4 — IoC List Management
+        // Section 4 — Blocklist Browser
+        SectionCard(
+            "Blocklist (hash_overrides.db)",
+            "View and manage hashes in the agent's verdict override database. Verdict 2 = malicious (blocked)."
+        ) {
+            BlocklistSection(state, viewModel)
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Section 5 — IoC List Management
         SectionCard(
             "IoC List Management",
             "Import or manually add SHA256 hashes to check against this endpoint. Batch search to find which IoCs are present."
@@ -186,7 +196,7 @@ private fun HashSearchSection(state: HuntingState, viewModel: HuntingViewModel, 
             }
         }
         is SearchOutcome.Found -> {
-            HashResultCard(outcome.results, outcome.isQuarantined, outcome.quarantinePath, outcome.source, onAddException)
+            HashResultCard(outcome.results, outcome.isQuarantined, outcome.quarantinePath, outcome.source, onAddException, viewModel)
         }
         is SearchOutcome.Error -> ErrorBanner(outcome.message)
     }
@@ -198,7 +208,8 @@ private fun HashResultCard(
     isQuarantined: Boolean,
     quarantinePath: String?,
     source: String,
-    onAddException: ((String?, String?) -> Unit)?
+    onAddException: ((String?, String?) -> Unit)?,
+    viewModel: HuntingViewModel
 ) {
     val clipboard = LocalClipboardManager.current
     val sha256 = results.firstOrNull()?.sha256 ?: ""
@@ -263,6 +274,17 @@ private fun HashResultCard(
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Blocklist button — prominent
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .background(CortexColors.Error.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                    .border(1.dp, CortexColors.Error.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .clickable { viewModel.blacklistHash(sha256) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("Add to Blocklist", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CortexColors.Error)
+            }
             if (onAddException != null) {
                 ActionBtn("Add Exception") { onAddException(sha256, results.firstOrNull()?.filePath) }
             }
