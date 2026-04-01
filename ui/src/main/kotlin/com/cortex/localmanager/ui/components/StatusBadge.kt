@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,7 +18,9 @@ enum class StatusType(val bgColor: Color, val textColor: Color) {
     SUCCESS(Color(0xFF1B3A1B), CortexColors.Success),
     WARNING(Color(0xFF3A2E1B), CortexColors.Warning),
     ERROR(Color(0xFF3A1B1B), CortexColors.Error),
-    INFO(Color(0xFF1B2A3A), CortexColors.Info)
+    INFO(Color(0xFF1B2A3A), CortexColors.Info),
+    BLOCKED(Color(0xFF2A1B3A), CortexColors.ActionBlocked),
+    QUARANTINED(Color(0xFF1B2240), CortexColors.ActionQuarantined)
 }
 
 @Composable
@@ -41,12 +42,25 @@ fun StatusBadge(text: String, type: StatusType) {
 
 @Composable
 fun SeverityBadge(severity: Severity) {
-    val (type, label) = when (severity) {
-        Severity.CRITICAL -> StatusType.ERROR to "CRITICAL"
-        Severity.HIGH -> StatusType.WARNING to "HIGH"
-        Severity.MEDIUM -> StatusType.WARNING to "MEDIUM"
-        Severity.LOW -> StatusType.INFO to "LOW"
-        Severity.INFO -> StatusType.INFO to "INFO"
+    val color = when (severity) {
+        Severity.CRITICAL -> CortexColors.SeverityCritical
+        Severity.HIGH -> CortexColors.SeverityHigh
+        Severity.MEDIUM -> CortexColors.SeverityMedium
+        Severity.LOW -> CortexColors.SeverityLow
+        Severity.INFO -> CortexColors.SeverityInfo
     }
-    StatusBadge(label, type)
+    val bgColor = color.copy(alpha = 0.15f)
+    Box(
+        modifier = Modifier
+            .background(bgColor, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = severity.name,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
+    }
 }

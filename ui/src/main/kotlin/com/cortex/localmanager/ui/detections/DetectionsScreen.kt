@@ -28,7 +28,10 @@ import java.awt.FileDialog
 import java.io.File
 import java.nio.file.Path
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.datetime.Instant as KInstant
+import java.time.Instant as JInstant
 
 @Composable
 fun DetectionsScreen(
@@ -38,11 +41,9 @@ fun DetectionsScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    Row(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.weight(1f).fillMaxHeight()
-        ) {
-            // Filter bar + export
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Main content — always takes full width
+        Column(modifier = Modifier.fillMaxSize()) {
             FilterBar(
                 searchQuery = state.searchQuery,
                 onSearchChange = viewModel::setSearchQuery,
@@ -60,7 +61,45 @@ fun DetectionsScreen(
                 onDismissExport = viewModel::dismissExportMessage
             )
 
-            Spacer(Modifier.height(12.dp))
+            // Show security events error if any
+            if (state.error != null) {
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CortexColors.SeverityHigh.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "\u26A0 ${state.error}",
+                        fontSize = 11.sp,
+                        color = CortexColors.SeverityHigh
+                    )
+                }
+            }
+
+            // View mode toggle
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                ViewMode.entries.forEach { mode ->
+                    val isActive = mode == state.viewMode
+                    Box(
+                        modifier = Modifier
+                            .background(if (isActive) CortexColors.PaloAltoOrange.copy(alpha = 0.2f) else CortexColors.SurfaceVariant, RoundedCornerShape(4.dp))
+                            .clickable { viewModel.setViewMode(mode) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            when (mode) { ViewMode.TABLE -> "Table"; ViewMode.TIMELINE -> "Timeline" },
+                            fontSize = 11.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isActive) CortexColors.PaloAltoOrange else CortexColors.TextMuted
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
 
             if (state.filteredAlerts.isEmpty() && !state.isLoading) {
                 Box(
@@ -77,27 +116,39 @@ fun DetectionsScreen(
                     )
                 }
             } else {
-                AlertTable(
-                    alerts = state.filteredAlerts,
-                    selectedAlert = state.selectedAlert,
-                    onAlertClick = { viewModel.selectAlert(it) },
-                    sortColumn = state.sortColumn,
-                    sortAscending = state.sortAscending,
-                    onSort = viewModel::setSort
-                )
+                when (state.viewMode) {
+                    ViewMode.TABLE -> AlertTable(
+                        alerts = state.filteredAlerts,
+                        selectedAlert = state.selectedAlert,
+                        onAlertClick = { viewModel.selectAlert(it) },
+                        sortColumn = state.sortColumn,
+                        sortAscending = state.sortAscending,
+                        onSort = viewModel::setSort
+                    )
+                    ViewMode.TIMELINE -> TimelineView(
+                        alerts = state.filteredAlerts,
+                        onAlertClick = { viewModel.selectAlert(it) }
+                    )
+                }
             }
         }
 
-        // Detail panel
+        // Detail panel — overlay from right
         val selected = state.selectedAlert
         if (selected != null) {
-            Box(Modifier.width(1.dp).fillMaxHeight().background(CortexColors.Divider))
+            // Semi-transparent scrim
+            Box(
+                modifier = Modifier.fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { viewModel.selectAlert(null) }
+            )
+            // Panel pinned to right edge
             DetailPanel(
                 alert = selected,
                 onClose = { viewModel.selectAlert(null) },
                 onSearchHash = onSearchHash,
                 onAddException = onAddException,
-                modifier = Modifier.width(420.dp).fillMaxHeight()
+                modifier = Modifier.width(440.dp).fillMaxHeight().align(Alignment.CenterEnd)
             )
         }
     }
@@ -306,7 +357,7 @@ private fun AlertTable(
                     modifier = Modifier.fillMaxWidth().background(bgColor).clickable { onAlertClick(alert) }.padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Box(Modifier.width(140.dp)) {
-                        Text(alert.timestamp.toString().take(19).replace("T", " "), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = CortexColors.TextMuted, maxLines = 1)
+                        Text(formatLocalTime(alert.timestamp), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = CortexColors.TextMuted, maxLines = 1)
                     }
                     Box(Modifier.width(70.dp)) { SeverityBadge(alert.severity) }
                     Box(Modifier.width(90.dp)) {
@@ -325,7 +376,7 @@ private fun AlertTable(
                     }
                     Box(Modifier.width(80.dp)) {
                         val action = alert.actionTaken
-                        if (action != null) StatusBadge(action, when (action.lowercase()) { "blocked" -> StatusType.ERROR; "reported" -> StatusType.WARNING; else -> StatusType.INFO })
+                        if (action != null) StatusBadge(action, when (action.lowercase()) { "blocked" -> StatusType.BLOCKED; "quarantined" -> StatusType.QUARANTINED; else -> StatusType.INFO })
                         else Text("-", fontSize = 11.sp, color = CortexColors.TextMuted)
                     }
                 }
@@ -389,7 +440,7 @@ private fun DetailPanel(
                 AlertType.PREVENTION -> StatusType.ERROR; AlertType.EDR -> StatusType.WARNING; AlertType.TELEMETRY -> StatusType.INFO
             })
             alert.actionTaken?.let {
-                StatusBadge(it, when (it.lowercase()) { "blocked" -> StatusType.ERROR; "reported" -> StatusType.WARNING; else -> StatusType.INFO })
+                StatusBadge(it, when (it.lowercase()) { "blocked" -> StatusType.BLOCKED; "quarantined" -> StatusType.QUARANTINED; else -> StatusType.INFO })
             }
         }
 
@@ -431,6 +482,71 @@ private fun DetailPanel(
             alert.parentPid?.let { DetailRow("Parent PID", it.toString(), copyable = true) }
             alert.user?.let { DetailRow("User", it, copyable = true) }
             alert.userSid?.let { DetailRow("SID", it, monospace = true, copyable = true) }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // MITRE ATT&CK
+        if (alert.mitreTechniques.isNotEmpty() || alert.mitreTactics.isNotEmpty()) {
+            SectionHeader("MITRE ATT&CK")
+            if (alert.mitreTechniques.isNotEmpty()) {
+                DetailRow("Techniques", alert.mitreTechniques.joinToString(", "), copyable = true)
+            }
+            if (alert.mitreTactics.isNotEmpty()) {
+                DetailRow("Tactics", alert.mitreTactics.joinToString(", "), copyable = true)
+            }
+            alert.ruleName?.let { DetailRow("Rule", it) }
+            alert.ruleDescription?.let { DetailRow("Description", it) }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // BTP Script Content (AMSI capture)
+        val script = alert.scriptContent
+        if (script != null) {
+            var showScript by remember { mutableStateOf(false) }
+            SectionHeader("Captured Script (${alert.scriptEngine ?: "AMSI"})")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { showScript = !showScript }.padding(vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (showScript) "\u25BC Hide script content" else "\u25B6 Show script content (${script.length} chars)",
+                    fontSize = 11.sp, fontWeight = FontWeight.Medium, color = CortexColors.PaloAltoOrange
+                )
+            }
+            if (showScript) {
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier.fillMaxWidth()
+                        .background(Color(0xFF1A1A2E), RoundedCornerShape(4.dp))
+                        .border(1.dp, CortexColors.Border, RoundedCornerShape(4.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        script,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = Color(0xFFE0E0E0),
+                        lineHeight = 14.sp
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Child processes (causality chain)
+        if (alert.childProcesses.isNotEmpty()) {
+            SectionHeader("Related Processes")
+            alert.childProcesses.take(10).forEach { proc ->
+                Row(modifier = Modifier.padding(bottom = 4.dp)) {
+                    Text("\u2192 ", fontSize = 11.sp, color = CortexColors.TextMuted)
+                    Column {
+                        Text(proc.name, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = CortexColors.TextPrimary)
+                        proc.commandLine?.let {
+                            Text(it, fontFamily = FontFamily.Monospace, fontSize = 9.sp, color = CortexColors.TextMuted, maxLines = 2)
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
         }
 
@@ -518,4 +634,16 @@ private fun formatFileSize(bytes: Long): String = when {
     bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
     bytes >= 1024 -> "%.1f KB".format(bytes / 1024.0)
     else -> "$bytes B"
+}
+
+private val localTimeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+/** Convert kotlinx.datetime.Instant (UTC) to local time string */
+private fun formatLocalTime(timestamp: kotlinx.datetime.Instant): String {
+    return try {
+        val javaInstant = JInstant.ofEpochSecond(timestamp.epochSeconds, timestamp.nanosecondsOfSecond.toLong())
+        localTimeFmt.format(javaInstant.atZone(ZoneId.systemDefault()))
+    } catch (_: Exception) {
+        timestamp.toString().take(19).replace("T", " ")
+    }
 }

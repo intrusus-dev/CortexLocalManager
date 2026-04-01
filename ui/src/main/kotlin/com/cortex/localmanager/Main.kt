@@ -26,6 +26,17 @@ import com.cortex.localmanager.ui.detections.DetectionsScreen
 import com.cortex.localmanager.ui.detections.DetectionsViewModel
 import com.cortex.localmanager.ui.hunting.HuntingScreen
 import com.cortex.localmanager.ui.hunting.HuntingViewModel
+import com.cortex.localmanager.ui.inventory.InventoryScreen
+import com.cortex.localmanager.ui.inventory.InventoryViewModel
+import com.cortex.localmanager.ui.quarantine.QuarantineScreen
+import com.cortex.localmanager.ui.quarantine.QuarantineViewModel
+import com.cortex.localmanager.ui.agentcontrol.AgentControlScreen
+import com.cortex.localmanager.ui.agentcontrol.AgentControlViewModel
+import com.cortex.localmanager.core.forensics.ForensicCollector
+import com.cortex.localmanager.ui.forensics.ForensicsScreen
+import com.cortex.localmanager.ui.forensics.ForensicsViewModel
+import com.cortex.localmanager.ui.scan.ScanScreen
+import com.cortex.localmanager.ui.scan.ScanViewModel
 import com.cortex.localmanager.ui.navigation.Screen
 import com.cortex.localmanager.ui.theme.CortexColors
 import com.cortex.localmanager.ui.theme.CortexTheme
@@ -58,15 +69,50 @@ fun main() = application {
         val detectionsViewModel = remember {
             DetectionsViewModel(
                 logRepository = serviceLocator.logRepository,
-                scope = uiScope
+                scope = uiScope,
+                securityEventsError = serviceLocator.securityEventsError
             )
         }
 
         val huntingViewModel = remember {
             HuntingViewModel(
                 cytoolCommands = serviceLocator.cytoolCommands,
+                scope = uiScope,
+                logRepository = serviceLocator.logRepository
+            )
+        }
+
+        val quarantineViewModel = remember {
+            QuarantineViewModel(
+                cytoolCommands = serviceLocator.cytoolCommands,
                 scope = uiScope
             )
+        }
+
+        val forensicsViewModel = remember {
+            ForensicsViewModel(
+                collector = ForensicCollector(serviceLocator.cytoolExecutor),
+                passwordProvider = { supervisorPassword.value },
+                scope = uiScope
+            )
+        }
+
+        val agentControlViewModel = remember {
+            AgentControlViewModel(
+                cytoolCommands = serviceLocator.cytoolCommands,
+                scope = uiScope
+            )
+        }
+
+        val scanViewModel = remember {
+            ScanViewModel(
+                cytoolCommands = serviceLocator.cytoolCommands,
+                scope = uiScope
+            )
+        }
+
+        val inventoryViewModel = remember {
+            InventoryViewModel(scope = uiScope)
         }
 
         // Track hash to pre-fill when navigating from Detections → Hunting
@@ -105,6 +151,8 @@ fun main() = application {
                     when (currentScreen) {
                         Screen.DASHBOARD -> dashboardViewModel.refresh()
                         Screen.DETECTIONS -> detectionsViewModel.refresh()
+                        Screen.QUARANTINE -> quarantineViewModel.refresh()
+                        Screen.INVENTORY -> inventoryViewModel.collect()
                         else -> {}
                     }
                     // Also refresh security events if password available
@@ -148,6 +196,11 @@ fun main() = application {
                                 prefilledHash = huntingPrefilledHash.also { huntingPrefilledHash = null }
                             )
                         }
+                        Screen.QUARANTINE -> QuarantineScreen(viewModel = quarantineViewModel)
+                        Screen.SCAN -> ScanScreen(viewModel = scanViewModel)
+                        Screen.FORENSICS -> ForensicsScreen(viewModel = forensicsViewModel)
+                        Screen.AGENT_CONTROL -> AgentControlScreen(viewModel = agentControlViewModel)
+                        Screen.INVENTORY -> InventoryScreen(viewModel = inventoryViewModel)
                         else -> PlaceholderScreen(screen)
                     }
                 }

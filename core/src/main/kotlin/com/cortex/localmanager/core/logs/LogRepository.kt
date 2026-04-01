@@ -77,10 +77,24 @@ class LogRepository(
 
         // Load from Windows Event Log (works regardless of file directory)
         preventionParser.readFromEventLog(maxEvents = 200)
-            .onSuccess { alerts ->
-                logger.info { "Loaded ${alerts.size} alerts from Windows Event Log" }
-                val eventLogAlerts = alerts.map { it.toUnifiedAlert(AlertSource.EVENT_LOG) }
-                allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogAlerts))
+            .onSuccess { results ->
+                // Handle traditionally parsed alerts
+                if (results.alerts.isNotEmpty()) {
+                    logger.info { "Loaded ${results.alerts.size} parsed alerts from Windows Event Log" }
+                    val eventLogAlerts = results.alerts.map { it.toUnifiedAlert(AlertSource.EVENT_LOG) }
+                    allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogAlerts))
+                }
+                // Handle embedded JSON events (Cortex XDR pattern)
+                for (jsonStr in results.embeddedJsons) {
+                    val normalized = if (jsonStr.trim().startsWith("{")) "[$jsonStr]" else jsonStr
+                    val parsed = SecurityEventsParser.parseSecurityEvents(normalized)
+                    if (parsed.isNotEmpty()) {
+                        logger.info { "Parsed ${parsed.size} rich alerts from Event Log embedded JSON" }
+                        // Mark these as EVENT_LOG source but with full detail
+                        val eventLogRichAlerts = parsed.map { it.copy(source = AlertSource.EVENT_LOG) }
+                        allAlerts.addAll(deduplicateEventLog(allAlerts, eventLogRichAlerts))
+                    }
+                }
             }
             .onFailure { logger.info(it) { "Event Log read skipped or failed" } }
 
@@ -99,9 +113,22 @@ class LogRepository(
     fun loadSecurityEvents(jsonArrayString: String) {
         val events = SecurityEventsParser.parseSecurityEvents(jsonArrayString)
         logger.info { "Loaded ${events.size} alerts from security_events" }
-        // Replace existing security_events alerts, keep everything else
-        val nonSecEvents = _alerts.value.filter { it.source != AlertSource.SECURITY_EVENTS }
-        _alerts.value = (nonSecEvents + events).sortedByDescending { it.timestamp }
+
+        if (events.isNotEmpty()) {
+            // security_events.db is the authoritative source — remove all Event Log alerts
+            // since they are either duplicates (sparse) or partial data
+            val kept = _alerts.value.filter {
+                it.source != AlertSource.SECURITY_EVENTS && it.source != AlertSource.EVENT_LOG
+            }
+            val removedCount = _alerts.value.size - kept.size
+            _alerts.value = (kept + events).sortedByDescending { it.timestamp }
+            logger.info { "Total alerts: ${_alerts.value.size} (replaced $removedCount Event Log/security_events alerts)" }
+        } else {
+            // No events parsed — just clear old security_events, keep Event Log as fallback
+            val nonSecEvents = _alerts.value.filter { it.source != AlertSource.SECURITY_EVENTS }
+            _alerts.value = nonSecEvents.sortedByDescending { it.timestamp }
+            logger.info { "No security events parsed, keeping ${_alerts.value.size} alerts from other sources" }
+        }
     }
 
     /**

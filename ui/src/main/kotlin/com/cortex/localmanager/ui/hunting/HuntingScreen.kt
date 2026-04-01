@@ -65,37 +65,75 @@ fun HuntingScreen(
         }
 
         // Section 1 — Hash Search
-        SectionCard("Hash Search") {
+        SectionCard(
+            "File Search",
+            "Search the local XDR agent database for files by SHA256 hash or file path. Also checks loaded security alerts."
+        ) {
             HashSearchSection(state, viewModel, onAddException)
         }
 
         Spacer(Modifier.height(16.dp))
 
         // Section 2 — Hash DB Management
-        SectionCard("Hash Database") {
+        SectionCard(
+            "Hash Database",
+            "Trigger a filesystem scan to refresh the agent's local hash database. New/modified files will be indexed."
+        ) {
             HashDbSection(state, viewModel)
         }
 
         Spacer(Modifier.height(16.dp))
 
         // Section 3 — Hash Browser
-        SectionCard("Hash Database Browser") {
+        SectionCard(
+            "Hash Database Browser",
+            "Browse all file hashes known to the agent (file_id_hash.db). Click a hash to search for its file location."
+        ) {
             HashBrowserSection(state, viewModel)
         }
 
         Spacer(Modifier.height(16.dp))
 
         // Section 4 — IoC List Management
-        SectionCard("IoC List Management") {
+        SectionCard(
+            "IoC List Management",
+            "Import or manually add SHA256 hashes to check against this endpoint. Batch search to find which IoCs are present."
+        ) {
             IocSection(state, viewModel)
         }
     }
 }
 
-// --- Section 1: Hash Search ---
+// --- Section 1: File Search ---
 
 @Composable
 private fun HashSearchSection(state: HuntingState, viewModel: HuntingViewModel, onAddException: ((String?, String?) -> Unit)?) {
+    // Mode toggle
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+        Text("Search by:", fontSize = 12.sp, color = CortexColors.TextMuted)
+        Spacer(Modifier.width(8.dp))
+        SearchMode.entries.forEach { mode ->
+            val isActive = state.searchMode == mode
+            Box(
+                modifier = Modifier
+                    .background(
+                        if (isActive) CortexColors.PaloAltoOrange.copy(alpha = 0.2f) else CortexColors.SurfaceVariant,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable { viewModel.setSearchMode(mode) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = when (mode) { SearchMode.HASH -> "SHA256 Hash"; SearchMode.PATH -> "File Path" },
+                    fontSize = 11.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isActive) CortexColors.PaloAltoOrange else CortexColors.TextMuted
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+        }
+    }
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -106,8 +144,12 @@ private fun HashSearchSection(state: HuntingState, viewModel: HuntingViewModel, 
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
+            val placeholder = when (state.searchMode) {
+                SearchMode.HASH -> "Enter SHA256 hash (64 hex characters)..."
+                SearchMode.PATH -> "Enter file path (e.g. C:\\Users\\...)..."
+            }
             if (state.searchInput.isEmpty()) {
-                Text("Enter SHA256 hash (64 hex characters)...", fontSize = 13.sp, color = CortexColors.TextMuted)
+                Text(placeholder, fontSize = 13.sp, color = CortexColors.TextMuted)
             }
             BasicTextField(
                 value = state.searchInput,
@@ -119,7 +161,7 @@ private fun HashSearchSection(state: HuntingState, viewModel: HuntingViewModel, 
             )
         }
         Spacer(Modifier.width(8.dp))
-        ActionBtn("Search") { viewModel.searchHash() }
+        ActionBtn("Search") { viewModel.search() }
     }
 
     if (!state.inputValid) {
@@ -144,33 +186,63 @@ private fun HashSearchSection(state: HuntingState, viewModel: HuntingViewModel, 
             }
         }
         is SearchOutcome.Found -> {
-            HashResultCard(outcome.results, onAddException)
+            HashResultCard(outcome.results, outcome.isQuarantined, outcome.quarantinePath, outcome.source, onAddException)
         }
         is SearchOutcome.Error -> ErrorBanner(outcome.message)
     }
 }
 
 @Composable
-private fun HashResultCard(results: List<FileSearchResult>, onAddException: ((String?, String?) -> Unit)?) {
+private fun HashResultCard(
+    results: List<FileSearchResult>,
+    isQuarantined: Boolean,
+    quarantinePath: String?,
+    source: String,
+    onAddException: ((String?, String?) -> Unit)?
+) {
     val clipboard = LocalClipboardManager.current
     val sha256 = results.firstOrNull()?.sha256 ?: ""
 
+    val borderColor = if (isQuarantined) CortexColors.ActionQuarantined else CortexColors.Success
+    val bgColor = if (isQuarantined) CortexColors.ActionQuarantined.copy(alpha = 0.08f) else CortexColors.Success.copy(alpha = 0.08f)
+
     Column(
         modifier = Modifier.fillMaxWidth()
-            .background(CortexColors.Success.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
-            .border(1.dp, CortexColors.Success.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            .background(bgColor, RoundedCornerShape(4.dp))
+            .border(1.dp, borderColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("\u2713 Hash Found", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CortexColors.Success)
-            Text(" \u2014 ${results.size} location${if (results.size > 1) "s" else ""}", fontSize = 13.sp, color = CortexColors.TextSecondary)
+            Text(
+                "\u2713 Hash Known on Endpoint",
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = borderColor
+            )
+            if (isQuarantined) {
+                Spacer(Modifier.width(8.dp))
+                StatusBadge("QUARANTINED", StatusType.QUARANTINED)
+            }
         }
+
+        Spacer(Modifier.height(4.dp))
+        Text(
+            when {
+                isQuarantined -> "This file was detected and quarantined by the agent. The original file is no longer at the path below."
+                source == "alert" -> "Found in security alerts. The file may have been blocked or removed."
+                else -> "Found in the agent's local file hash database."
+            },
+            fontSize = 11.sp, color = CortexColors.TextMuted
+        )
 
         Spacer(Modifier.height(8.dp))
 
         // SHA256 + MD5
         InfoLine("SHA256", sha256, mono = true, copyable = true)
-        results.firstOrNull()?.md5?.let { InfoLine("MD5", it, mono = true, copyable = true) }
+        results.firstOrNull()?.md5?.takeIf { it.isNotBlank() }?.let { InfoLine("MD5", it, mono = true, copyable = true) }
+
+        if (isQuarantined && quarantinePath != null) {
+            Spacer(Modifier.height(8.dp))
+            InfoLine("Quarantine Backup", quarantinePath, mono = true, copyable = true)
+        }
 
         Spacer(Modifier.height(12.dp))
 
@@ -179,7 +251,7 @@ private fun HashResultCard(results: List<FileSearchResult>, onAddException: ((St
             if (results.size > 1) {
                 Text("Location ${index + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CortexColors.TextMuted, modifier = Modifier.padding(bottom = 4.dp))
             }
-            InfoLine("Path", result.filePath, mono = true, copyable = true)
+            InfoLine(if (isQuarantined) "Original Path" else "Path", result.filePath, mono = true, copyable = true)
             result.fileId?.let { InfoLine("File ID", it, copyable = true) }
             result.dateCreated?.let { InfoLine("Created", it) }
             result.dateLastModified?.let { InfoLine("Last Modified", it) }
@@ -261,7 +333,14 @@ private fun HashBrowserSection(state: HuntingState, viewModel: HuntingViewModel)
         val filtered = state.hashEntries.filter {
             state.hashEntriesFilter.isBlank() || it.value.sha256.contains(state.hashEntriesFilter, ignoreCase = true)
         }
-        val displayed = filtered.take(200)
+        val displayLimit = if (state.hashEntriesFilter.isNotBlank()) 200 else 50
+        val displayed = filtered.take(displayLimit)
+
+        Text(
+            "Showing ${displayed.size} of ${filtered.size} entries" +
+                if (state.hashEntriesFilter.isBlank()) " (most recent). Use filter to search." else "",
+            fontSize = 10.sp, color = CortexColors.TextMuted, modifier = Modifier.padding(bottom = 6.dp)
+        )
 
         // Header
         Row(
@@ -295,8 +374,8 @@ private fun HashBrowserSection(state: HuntingState, viewModel: HuntingViewModel)
             }
         }
 
-        if (filtered.size > 200) {
-            Text("Showing 200 of ${filtered.size} entries. Use filter to narrow.", fontSize = 11.sp, color = CortexColors.TextMuted, modifier = Modifier.padding(8.dp))
+        if (filtered.size > displayLimit) {
+            Text("Use the filter above to find specific hashes.", fontSize = 11.sp, color = CortexColors.TextMuted, modifier = Modifier.padding(8.dp))
         }
     }
 }
@@ -361,6 +440,17 @@ private fun IocSection(state: HuntingState, viewModel: HuntingViewModel) {
                 else "Search All IoCs"
             ) {
                 if (!state.iocBatchSearching) viewModel.runBatchSearch()
+            }
+            // Blocklist button — prominent styling
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .background(CortexColors.Error.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                    .border(1.dp, CortexColors.Error.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .clickable { viewModel.blacklistIocs() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("Apply to Blocklist", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CortexColors.Error)
             }
             ActionBtn("Clear All") { viewModel.clearIocList() }
             if (state.iocSearchResults.isNotEmpty()) {
@@ -459,7 +549,7 @@ private fun IocSection(state: HuntingState, viewModel: HuntingViewModel) {
 // --- Shared helpers ---
 
 @Composable
-private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SectionCard(title: String, description: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth()
             .background(CortexColors.Surface, RoundedCornerShape(4.dp))
@@ -467,6 +557,10 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
             .padding(16.dp)
     ) {
         Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, color = CortexColors.TextMuted)
+        if (description != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(description, fontSize = 11.sp, color = CortexColors.TextMuted.copy(alpha = 0.7f))
+        }
         Spacer(Modifier.height(12.dp))
         content()
     }

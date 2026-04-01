@@ -25,6 +25,23 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.cortex.localmanager.MainKt"
+
+        nativeDistributions {
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
+            packageName = "CortexLocalManager"
+            packageVersion = "1.0.0"
+            description = "Cortex XDR Local Emergency Management Tool"
+            vendor = "Palo Alto Networks"
+            windows {
+                menuGroup = "Cortex Local Manager"
+                perUserInstall = false
+                shortcut = true
+                dirChooser = true
+                iconFile.set(project.file("src/main/resources/icon.ico"))
+            }
+            modules("java.naming", "java.sql", "jdk.unsupported")
+            jvmArgs("-Xmx512m")
+        }
     }
 }
 

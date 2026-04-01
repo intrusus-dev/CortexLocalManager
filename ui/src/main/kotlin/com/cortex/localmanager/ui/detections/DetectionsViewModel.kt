@@ -9,6 +9,7 @@ import java.nio.file.Path
 import kotlin.io.path.writeText
 
 enum class SortColumn { TIME, SEVERITY, TYPE, COMPONENT, PROCESS, DESCRIPTION }
+enum class ViewMode { TABLE, TIMELINE }
 
 data class DetectionsState(
     val isLoading: Boolean = true,
@@ -22,12 +23,14 @@ data class DetectionsState(
     val timeRange: TimeRange = TimeRange.LAST_24H,
     val sortColumn: SortColumn = SortColumn.TIME,
     val sortAscending: Boolean = false,
-    val exportMessage: String? = null
+    val exportMessage: String? = null,
+    val viewMode: ViewMode = ViewMode.TABLE
 )
 
 class DetectionsViewModel(
     private val logRepository: LogRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val securityEventsError: kotlinx.coroutines.flow.StateFlow<String?>? = null
 ) {
     private val _state = MutableStateFlow(DetectionsState())
     val state: StateFlow<DetectionsState> = _state.asStateFlow()
@@ -39,6 +42,13 @@ class DetectionsViewModel(
                     it.copy(allAlerts = alerts, isLoading = false)
                 }
                 applyFilters()
+            }
+        }
+        if (securityEventsError != null) {
+            scope.launch {
+                securityEventsError.collect { error ->
+                    _state.update { it.copy(error = error) }
+                }
             }
         }
     }
@@ -84,6 +94,10 @@ class DetectionsViewModel(
 
     fun selectAlert(alert: UnifiedAlert?) {
         _state.update { it.copy(selectedAlert = alert) }
+    }
+
+    fun setViewMode(mode: ViewMode) {
+        _state.update { it.copy(viewMode = mode) }
     }
 
     fun refresh() {

@@ -23,7 +23,23 @@ data class UnifiedAlert(
     val componentName: String?,
     val applicationName: String? = null,
     val publisher: String? = null,
-    val rawData: String?
+    val rawData: String?,
+    // BTP-specific fields
+    val scriptContent: String? = null,
+    val scriptEngine: String? = null,
+    val mitreTechniques: List<String> = emptyList(),
+    val mitreTactics: List<String> = emptyList(),
+    val ruleName: String? = null,
+    val ruleDescription: String? = null,
+    // Causality chain — child processes involved
+    val childProcesses: List<ProcessInfo> = emptyList()
+)
+
+data class ProcessInfo(
+    val name: String,
+    val commandLine: String?,
+    val pid: Long?,
+    val path: String?
 )
 
 enum class Severity { CRITICAL, HIGH, MEDIUM, LOW, INFO }

@@ -99,12 +99,14 @@ class PreventionLogParser {
     /**
      * Read prevention alerts from Windows Event Log via wevtutil.
      * Only works on Windows — returns empty list on other platforms.
+     *
+     * Returns a pair: (parsed PreventionAlerts, embedded JSON strings for SecurityEventsParser)
      */
-    fun readFromEventLog(maxEvents: Int = 100): Result<List<PreventionAlert>> = runCatching {
+    fun readFromEventLog(maxEvents: Int = 100): Result<EventLogResults> = runCatching {
         val os = System.getProperty("os.name", "").lowercase()
         if ("windows" !in os) {
             logger.debug { "Skipping Event Log read — not on Windows" }
-            return@runCatching emptyList()
+            return@runCatching EventLogResults(emptyList(), emptyList())
         }
 
         // Try multiple known Cortex XDR event log channels
@@ -114,30 +116,52 @@ class PreventionLogParser {
             "Cortex XDR"
         )
 
-        val allEvents = mutableListOf<PreventionAlert>()
+        val allParsedAlerts = mutableListOf<PreventionAlert>()
+        val allEmbeddedJsons = mutableListOf<String>()
+
         for (channel in channels) {
-            val channelEvents = readChannel(channel, maxEvents)
-            if (channelEvents.isNotEmpty()) {
-                logger.info { "Found ${channelEvents.size} events in channel '$channel'" }
-                allEvents.addAll(channelEvents)
-            }
+            val results = readChannel(channel, maxEvents)
+            processResults(results, allParsedAlerts, allEmbeddedJsons, channel)
         }
 
         // Also try querying by provider name in the Application/System logs
         val providerQuery = "*[System[Provider[@Name='Traps'] or Provider[@Name='Cortex XDR'] or Provider[@Name='CortexXDR']]]"
         for (logName in listOf("Application", "System")) {
-            val providerEvents = readChannelWithQuery(logName, providerQuery, maxEvents)
-            if (providerEvents.isNotEmpty()) {
-                logger.info { "Found ${providerEvents.size} events from XDR provider in '$logName'" }
-                allEvents.addAll(providerEvents)
-            }
+            val results = readChannelWithQuery(logName, providerQuery, maxEvents)
+            processResults(results, allParsedAlerts, allEmbeddedJsons, logName)
         }
 
-        logger.info { "Total Windows Event Log alerts: ${allEvents.size}" }
-        allEvents
+        logger.info { "Event Log: ${allParsedAlerts.size} parsed alerts, ${allEmbeddedJsons.size} embedded JSON events" }
+        EventLogResults(allParsedAlerts, allEmbeddedJsons)
     }
 
-    private fun readChannel(channel: String, maxEvents: Int): List<PreventionAlert> {
+    /** Aggregated results from Event Log reading */
+    data class EventLogResults(
+        val alerts: List<PreventionAlert>,
+        val embeddedJsons: List<String>
+    )
+
+    private fun processResults(
+        results: List<EventLogParseResult>,
+        alerts: MutableList<PreventionAlert>,
+        jsons: MutableList<String>,
+        sourceName: String
+    ) {
+        if (results.isEmpty()) return
+        var alertCount = 0
+        var jsonCount = 0
+        for (result in results) {
+            when (result) {
+                is EventLogParseResult.ParsedAlert -> { alerts.add(result.alert); alertCount++ }
+                is EventLogParseResult.EmbeddedJson -> { jsons.add(result.json); jsonCount++ }
+            }
+        }
+        if (alertCount > 0 || jsonCount > 0) {
+            logger.info { "Channel '$sourceName': $alertCount parsed alerts, $jsonCount embedded JSON events" }
+        }
+    }
+
+    private fun readChannel(channel: String, maxEvents: Int): List<EventLogParseResult> {
         return try {
             val process = ProcessBuilder(
                 "wevtutil", "qe", channel,
@@ -159,7 +183,7 @@ class PreventionLogParser {
         }
     }
 
-    private fun readChannelWithQuery(logName: String, query: String, maxEvents: Int): List<PreventionAlert> {
+    private fun readChannelWithQuery(logName: String, query: String, maxEvents: Int): List<EventLogParseResult> {
         return try {
             val process = ProcessBuilder(
                 "wevtutil", "qe", logName,
@@ -177,7 +201,7 @@ class PreventionLogParser {
         }
     }
 
-    private fun parseEventLogOutput(output: String): List<PreventionAlert> {
+    fun parseEventLogOutput(output: String): List<EventLogParseResult> {
         return output.split("</Event>")
             .filter { it.contains("<Event") }
             .mapNotNull { xmlBlock ->
@@ -191,7 +215,13 @@ class PreventionLogParser {
             }
     }
 
-    private fun parseEventLogXml(xml: String): PreventionAlert? {
+    /**
+     * Parses a single Windows Event Log XML entry.
+     * Cortex XDR may embed full JSON payloads in event data, or use named Data elements.
+     * Returns the embedded JSON string if found (for richer parsing via SecurityEventsParser),
+     * or falls back to extracting named Data fields.
+     */
+    fun parseEventLogXml(xml: String): EventLogParseResult? {
         val doc = docBuilderFactory.newDocumentBuilder()
             .parse(InputSource(StringReader(xml)))
         doc.documentElement.normalize()
@@ -211,18 +241,46 @@ class PreventionLogParser {
             try { Instant.parse(it) } catch (_: Exception) { null }
         } ?: return null
 
-        // Extract data fields from EventData
+        // Collect all data from EventData — both named and unnamed elements
         val dataMap = mutableMapOf<String, String>()
+        val unnamedData = mutableListOf<String>()
         if (eventDataNode.length > 0) {
             val dataNodes = eventDataNode.item(0).childNodes
             for (i in 0 until dataNodes.length) {
                 val node = dataNodes.item(i)
-                val name = node.attributes?.getNamedItem("Name")?.nodeValue ?: continue
-                dataMap[name] = node.textContent ?: ""
+                val text = node.textContent?.trim() ?: continue
+                if (text.isEmpty()) continue
+                val name = node.attributes?.getNamedItem("Name")?.nodeValue
+                if (name != null) {
+                    dataMap[name] = text
+                } else if (text.isNotBlank()) {
+                    unnamedData.add(text)
+                }
             }
         }
 
-        return PreventionAlert(
+        // Check if any data field contains embedded JSON (Cortex XDR pattern)
+        val allTextValues = dataMap.values + unnamedData
+        for (value in allTextValues) {
+            val trimmed = value.trim()
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+                (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+                logger.debug { "Found embedded JSON in Event Log entry" }
+                return EventLogParseResult.EmbeddedJson(trimmed, timestamp)
+            }
+        }
+
+        // Also check the full text content of EventData as fallback
+        if (eventDataNode.length > 0) {
+            val fullText = eventDataNode.item(0).textContent?.trim() ?: ""
+            if (fullText.startsWith("{") || fullText.startsWith("[")) {
+                logger.debug { "Found embedded JSON in EventData full text" }
+                return EventLogParseResult.EmbeddedJson(fullText, timestamp)
+            }
+        }
+
+        // Fall back to named Data elements
+        val alert = PreventionAlert(
             timestamp = timestamp,
             processPath = dataMap["ProcessPath"],
             pid = dataMap["PID"]?.toLongOrNull(),
@@ -239,6 +297,15 @@ class PreventionLogParser {
             osVersion = null,
             sourceFile = "WindowsEventLog"
         )
+        return EventLogParseResult.ParsedAlert(alert)
+    }
+
+    /** Result of parsing an Event Log XML entry */
+    sealed class EventLogParseResult {
+        /** Cortex XDR embeds full JSON in the event data — parse with SecurityEventsParser */
+        data class EmbeddedJson(val json: String, val timestamp: Instant) : EventLogParseResult()
+        /** Traditional named Data elements — already parsed into a PreventionAlert */
+        data class ParsedAlert(val alert: PreventionAlert) : EventLogParseResult()
     }
 
     private fun getElementText(root: org.w3c.dom.Element, tagName: String): String? {

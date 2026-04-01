@@ -30,10 +30,14 @@ object CortexColors {
     val Info = Color(0xFF42A5F5)
 
     val SeverityCritical = Color(0xFFE53935)
-    val SeverityHigh = Color(0xFFFB8C00)
+    val SeverityHigh = Color(0xFFFF6D00)      // deeper orange, clearly distinct from medium
     val SeverityMedium = Color(0xFFFFCA28)
     val SeverityLow = Color(0xFF42A5F5)
     val SeverityInfo = Color(0xFF78909C)
+
+    // Action badge colors
+    val ActionBlocked = Color(0xFF7C4DFF)     // purple for blocked
+    val ActionQuarantined = Color(0xFF448AFF)  // blue for quarantined
 
     val Border = Color(0xFF2E2E42)
     val Divider = Color(0xFF2A2A3C)

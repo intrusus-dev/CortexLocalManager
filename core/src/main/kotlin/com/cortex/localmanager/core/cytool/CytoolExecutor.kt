@@ -70,7 +70,6 @@ class CytoolExecutor(
 
         val errorPatterns: List<Pair<String, String>> = listOf(
             "Access denied" to "Access denied — check supervisor password",
-            "not found" to "Resource not found",
             "Failed to" to "Operation failed",
             "Error:" to (output.lines().firstOrNull { it.contains("Error:") }?.trim() ?: "Unknown error"),
             "is not recognized" to "cytool not found at configured path"

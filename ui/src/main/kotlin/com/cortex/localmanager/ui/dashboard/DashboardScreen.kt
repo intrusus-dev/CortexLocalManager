@@ -20,6 +20,9 @@ import com.cortex.localmanager.core.models.Severity
 import com.cortex.localmanager.core.models.UnifiedAlert
 import com.cortex.localmanager.ui.components.*
 import com.cortex.localmanager.ui.theme.CortexColors
+import java.time.Instant as JInstant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun DashboardScreen(
@@ -300,7 +303,7 @@ private fun AlertRow(
     ) {
         // Timestamp
         Text(
-            text = alert.timestamp.toString().take(19).replace("T", " "),
+            text = formatLocalTime(alert.timestamp),
             fontFamily = FontFamily.Monospace,
             fontSize = 11.sp,
             color = CortexColors.TextMuted,
@@ -347,5 +350,16 @@ private fun AlertRow(
             maxLines = 1,
             modifier = Modifier.weight(1.5f)
         )
+    }
+}
+
+private val localTimeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+private fun formatLocalTime(timestamp: kotlinx.datetime.Instant): String {
+    return try {
+        val javaInstant = JInstant.ofEpochSecond(timestamp.epochSeconds, timestamp.nanosecondsOfSecond.toLong())
+        localTimeFmt.format(javaInstant.atZone(ZoneId.systemDefault()))
+    } catch (_: Exception) {
+        timestamp.toString().take(19).replace("T", " ")
     }
 }

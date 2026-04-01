@@ -8,10 +8,17 @@ import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+private val prettyJson = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
 /**
- * Parses the JSON output from `cytool security_events print`.
+ * Parses the JSON output from `cytool security_events print` or `cytool persist print security_events.db`.
  * This is the richest alert data source — returns full prevention event detail.
+ *
+ * Handles two JSON formats:
+ * 1. Direct event objects (from `security_events print`): [{event fields...}, ...]
+ * 2. Persist print wrapped format: [{"key":"...","value":{"event":{event fields...},"lruData":{...}}}, ...]
+ *
+ * Field names may be snake_case or camelCase depending on the source.
  */
 object SecurityEventsParser {
 
@@ -23,7 +30,13 @@ object SecurityEventsParser {
             logger.info { "Parsing ${array.size} security events" }
             array.mapNotNull { element ->
                 try {
-                    parseEvent(element.jsonObject)
+                    val obj = element.jsonObject
+                    // Unwrap persist print format: {"key":"...","value":{"event":{...},"lruData":{...}}}
+                    val eventObj = obj["value"]?.jsonObject?.get("event")?.jsonObject  // persist print
+                        ?: obj["value"]?.jsonObject   // value without event wrapper
+                        ?: obj["event"]?.jsonObject    // event at top level
+                        ?: obj                         // direct event object
+                    parseEvent(eventObj)
                 } catch (e: Exception) {
                     logger.debug { "Failed to parse security event: ${e.message}" }
                     null
@@ -45,13 +58,17 @@ object SecurityEventsParser {
         val description = obj.str("description") ?: "Prevention Alert"
         val blocked = obj.bool("blocked") ?: false
 
-        // Process info from source_process
-        val sourceProcess = obj["source_process"]?.jsonObject
-        val processCommandLine = sourceProcess?.str("command_line")?.trim()
-        val processPath = processCommandLine?.let { extractExePath(it) }
+        // Process info — handle both camelCase and snake_case
+        val sourceProcess = obj["sourceProcess"]?.jsonObject
+            ?: obj["source_process"]?.jsonObject
+        val processCommandLine = sourceProcess?.str("commandLine")
+            ?: sourceProcess?.str("command_line")
+        val processPath = processCommandLine?.trim()?.let { extractExePath(it) }
         val pid = sourceProcess?.long("id")
-        val parentPid = sourceProcess?.long("parent_id")
-        val userName = sourceProcess?.str("user_name")
+        val parentPid = sourceProcess?.long("parentId")
+            ?: sourceProcess?.long("parent_id")
+        val userName = sourceProcess?.str("userName")
+            ?: sourceProcess?.str("user_name")
 
         // User info
         val user = obj["user"]?.jsonObject
@@ -65,41 +82,97 @@ object SecurityEventsParser {
         val fileSha256 = firstFile?.str("sha256") ?: sha256
         val fileMd5 = firstFile?.str("md5") ?: md5
         val fileSize = firstFile?.str("size")?.toLongOrNull()
-        val quarantineId = firstFile?.str("quarantine_id")
+        val quarantineId = firstFile?.str("quarantineId")
+            ?: firstFile?.str("quarantine_id")
         val applicationName = firstFile?.str("name")
         val publisher = firstFile?.str("publisher")
 
-        // Severity mapping
+        // Severity mapping — handle both camelCase and snake_case
         val severityStr = obj.str("severity")
-        val verdictScore = obj.int("verdict_score")
+        val verdictScore = obj.int("verdictScore") ?: obj.int("verdict_score")
         val severity = mapSeverity(severityStr, verdictScore, blocked)
 
-        // Component — derive from module_id or description
-        val moduleId = obj.int("module_id")
-        val componentName = mapComponent(moduleId, description)
+        // Component — derive from moduleId, enriched with WildFire verdict if available
+        val moduleId = obj.int("moduleId") ?: obj.int("module_id")
+        val wfVerdict = obj.int("wfVerdict") ?: obj.int("wf_verdict")
+        val componentName = mapComponent(moduleId, description, wfVerdict)
 
         // Action
         val actionTaken = when {
-            blocked -> "blocked"
-            quarantineId != null -> "quarantined"
-            else -> "reported"
+            quarantineId != null && quarantineId.isNotEmpty() -> "quarantined"
+            else -> "blocked"
+        }
+
+        // BTP-specific: extract AMSI script content from dynamicAnalysis.internals
+        val dynamicAnalysis = obj["dynamicAnalysis"]?.jsonObject
+        val internals = dynamicAnalysis?.get("internals")?.jsonArray
+        var scriptContent: String? = null
+        var scriptEngine: String? = null
+        if (internals != null) {
+            for (internal in internals) {
+                val internalObj = internal.jsonObject
+                val name = internalObj.str("name") ?: ""
+                if (name.contains("amsi", ignoreCase = true)) {
+                    val attrs = internalObj["attributes"]?.jsonObject ?: continue
+                    val content = attrs.str("content")
+                    if (content != null && content.isNotBlank() && scriptContent == null) {
+                        scriptContent = content
+                        scriptEngine = attrs.str("script_engine")?.let { engine ->
+                            // Extract just the engine name: "PowerShell_C:\...\powershell.exe_10..." → "PowerShell"
+                            engine.substringBefore("_").ifEmpty { engine }
+                        }
+                    }
+                }
+            }
+        }
+
+        // MITRE ATT&CK
+        val techniques = obj["techniqueId"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?: emptyList()
+        val tactics = obj["tacticId"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?: emptyList()
+
+        // BTP rule info
+        val ruleName = obj.str("ruleName")
+        val ruleDescription = obj.str("ruleExternalDescription")
+
+        // Child processes from processes map (skip the source process)
+        val childProcesses = mutableListOf<ProcessInfo>()
+        val processesMap = obj["processes"]?.jsonObject
+        val sourceInstanceId = sourceProcess?.str("instanceId")
+        if (processesMap != null) {
+            for ((_, procElement) in processesMap) {
+                val proc = procElement.jsonObject
+                val instId = proc.str("instanceId")
+                if (instId == sourceInstanceId) continue // skip source process
+                val cmdLine = proc.str("commandLine")?.trim() ?: continue
+                val procName = extractExePath(cmdLine)?.substringAfterLast("\\") ?: continue
+                childProcesses.add(ProcessInfo(
+                    name = procName,
+                    commandLine = cmdLine,
+                    pid = proc.long("id"),
+                    path = extractExePath(cmdLine)
+                ))
+            }
         }
 
         // Build raw data for the detail view
         val rawData = try {
-            Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), obj)
+            prettyJson.encodeToString(JsonObject.serializer(), obj)
         } catch (_: Exception) {
             obj.toString()
         }
 
         return UnifiedAlert(
-            id = obj.str("prevention_id") ?: UUID.randomUUID().toString(),
+            id = obj.str("preventionId") ?: obj.str("prevention_id") ?: UUID.randomUUID().toString(),
             timestamp = timestamp,
             severity = severity,
             alertType = AlertType.PREVENTION,
             source = AlertSource.SECURITY_EVENTS,
             processPath = processPath,
-            commandLine = processCommandLine,
+            commandLine = processCommandLine?.trim(),
             pid = pid,
             parentPid = parentPid,
             sha256 = fileSha256,
@@ -113,7 +186,14 @@ object SecurityEventsParser {
             componentName = componentName,
             applicationName = applicationName,
             publisher = publisher,
-            rawData = rawData
+            rawData = rawData,
+            scriptContent = scriptContent,
+            scriptEngine = scriptEngine,
+            mitreTechniques = techniques,
+            mitreTactics = tactics,
+            ruleName = ruleName,
+            ruleDescription = ruleDescription,
+            childProcesses = childProcesses
         )
     }
 
@@ -137,11 +217,11 @@ object SecurityEventsParser {
         }
     }
 
-    private fun mapComponent(moduleId: Int?, description: String?): String {
+    private fun mapComponent(moduleId: Int?, description: String?, wfVerdict: Int? = null): String {
         // Known module IDs from Cortex XDR
-        return when (moduleId) {
+        val baseComponent = when (moduleId) {
             294 -> "LocalAnalysis"
-            256 -> "BehavioralThreat"
+            256, 327 -> "BehavioralThreat"
             280 -> "WildFire"
             else -> when {
                 description?.contains("Local Analysis", ignoreCase = true) == true -> "LocalAnalysis"
@@ -150,6 +230,12 @@ object SecurityEventsParser {
                 else -> "Prevention"
             }
         }
+        // If initial detection was LocalAnalysis but WildFire also returned a malicious verdict,
+        // show both to indicate the enriched detection chain
+        if (baseComponent == "LocalAnalysis" && wfVerdict != null && wfVerdict >= 2) {
+            return "LocalAnalysis + WildFire"
+        }
+        return baseComponent
     }
 
     private fun extractExePath(commandLine: String): String? {
